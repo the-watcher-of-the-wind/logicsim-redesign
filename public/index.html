@@ -1,156 +1,159 @@
-<!DOCTYPE html>
-<html>
-
+<!doctype html>
+<html lang="zh-CN">
 <head>
-    <meta content="text/html;charset=utf-8" http-equiv="content-type" />
-    <meta content="IE=edge" http-equiv="X-UA-Compatible" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" type="text/css" href="lib/joint.css" />
-    <link href="lib/select2.min.css" rel="stylesheet" />
-    <link href="lib/w3.css" rel="stylesheet" />
-    <link rel="stylesheet" type="text/css" href="style.css" />
-
-
-    <!-- dependencies -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f9fc">
+    <meta name="description" content="输入逆波兰逻辑表达式，生成清晰的逻辑结构图。">
+    <title>LogicSim · 逻辑结构工作台</title>
+    <link rel="icon" href="favicon.ico">
+    <link rel="stylesheet" href="lib/joint.css">
+    <link rel="stylesheet" href="style.css">
     <script src="lib/jquery.min.js"></script>
     <script src="lib/lodash.min.js"></script>
     <script src="lib/backbone.js"></script>
     <script src="lib/graphlib.min.js"></script>
     <script src="lib/dagre.min.js"></script>
     <script src="lib/joint.js"></script>
-    <script src="lib/select2.min.js"></script>
     <script src="LogicParser.js"></script>
 </head>
-
 <body>
-    <!-- content -->
-    <div class="joint-app">
-        <div class="app-header">
-            <div class="mini-map">
-                <div id="mini-paper"></div>
-                <div id="mini-view">
-                    <div id="mini-resize"></div>
-                </div>
-            </div>
-            <div class="title-container">
-                <div style="width:33%;float:left;overflow:auto;">
-                    <div class="w3-row" style="margin:1px">
-                        <div class="w3-third w3-btn w3-light-green  w3-hover-green"
-                            style="position: relative;overflow: hidden;cursor:pointer">
-                            <img src="assets/icons/save2.svg" width="15" height="15" class="w3-margin-right" />
-                            <span>载入文本</span>
-                            <input type="file" style="position: absolute;
-                            top: 0;
-                            right: 0;
-                            margin: 0;
-                            padding: 0;
-                            font-size: 20px;
-                            cursor: pointer;
-                            opacity: 0;
-                            filter: alpha(opacity=0)" id="fileToLoad" />
-                        </div>
-                        <button class="w3-third w3-btn w3-light-blue  w3-hover-blue" onclick="app.saveTextAsFile()"><img
-                                src="assets/icons/upload.svg" width="15" height="15"
-                                class="w3-margin-right" />保存文本</button>
-                        <input class="w3-third w3-input w3-center" id="inputFileNameToSaveAs" value="默认保存名称"></input>
-                    </div>
-
-
-                    <textarea style="width:100%;height:60px" id="ReversePol"></textarea>
-
-                    <button class="w3-block w3-btn w3-yellow  w3-hover-deep-orange w3-round-large"
-                        onclick="app.parseLogic()">解析文本</button>
-
-                </div>
-                <div style="width:65%;float:left">
-                    <table style="width:100%">
-                        <tr>
-                            <td colspan="2">
-                                <textarea id="myModel" style="width:100%;height:100px">
-                            {
-                                nodeArray: [],
-                                linkArray: []
-                            }
-                        </textarea>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <button id="LoadButton" class="w3-block w3-btn w3-light-green w3-hover-green"
-                                    onclick="app.load()"><img src="assets/icons/save2.svg" width="15" height="15"
-                                        class="w3-margin-right" />文本转图</button>
-                            </td>
-                            <td>
-                                <button id="SaveButton" class="w3-block w3-btn w3-light-blue  w3-hover-blue"
-                                    onclick="app.save()"><img src="assets/icons/upload.svg" width="15" height="15"
-                                        class="w3-margin-right" />图转文本</button>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class="app-body">
-            <div class="left-container">
-
-            </div>
-            <div class="main-container">
-                <div id="paper-container">
-                    <div id="paper" style="cursor:grab">
-                    </div>
-                </div>
-            </div>
-            <div id="app-resize">
-                <div style="position:absolute;left:-35px;background-image:url(assets/box-arrow-in-right.svg);background-size:100%;width:30px;height:30px;"
-                    onclick="
-                app.ResizeBlock()
-                ">
-
-                </div>
-            </div>
-            <div class="right-container">
-                <div class="w3-row">
-                    <div class="w3-third">
-                        元素名称：
-                    </div>
-                    <input class="w3-twothird" type="text" id="ERName" />
-                </div>
-                <div class="w3-row">
-                    <div class="w3-third">
-                        元素备注：
-                    </div>
-                    <textarea class="w3-twothird" id="ERMemo">
-                    </textarea>
-                </div>
-                <button id="ERSetName" class="w3-block w3-btn w3-yellow  w3-hover-deep-orange w3-round-large"
-                    onclick="app.ChangeName()">保存修改</button>
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="brand">
+                <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
                 <div>
-                    在“解析文本”按钮上面的文本框内输入“逆波兰逻辑表达式”。<br/>
-                    “逆波兰逻辑表达式”支持五种逻辑操作符：<br/>
-                    {<br/>
-                    “.”：“a b .”代表“a”和“b”的逻辑与，<br/>
-                    “<”：“a <”代表“a”的逻辑非，<br/>
-                    “,”：“a b ,”代表“a”和“b”的逻辑或，<br/>
-                    “=”：“a b =”代表“a”和“b”的逻辑等价/同或<br/>
-                    “>”：“a b >”代表“a”和“b”的逻辑推出，<br/>
-                      }。<br/>
-                    逆波兰逻辑表达式组合的举例说明：<br/>
-                    {<br/>
-                    “a b . fe >”即代表逻辑表达“a 与 b   推出了   fe”，<br/>
-                    “a b . fe ge > =”即代表逻辑表达“a 与 b  等价于  fe 推出了 ge”<br/>
-                    }。<br/>
-                    之后点击“解析文本”按钮，将“逆波兰逻辑表达式”转换为适合图形表示的 JSON 格式，<br/>
-                    之后再点击“解析文本”按钮旁的“文本转图”，得到最终的正规图形表示。
+                    <strong>LogicSim</strong>
+                    <small>逻辑结构工作台</small>
                 </div>
             </div>
-            <div class="bottom-container">
-                <p id="status">Diagram Model loaded from Json Format.</p>
+            <div class="topbar-actions">
+                <button id="importButton" class="button button-secondary import-button" type="button">导入 JSON</button>
+                <input id="fileToLoad" type="file" accept=".json,application/json,text/plain" hidden>
+                <button id="downloadButton" class="button button-secondary" type="button">下载 JSON</button>
             </div>
-        </div>
-    </div>
-    <script src="ViewGen.js">
-    </script>
-</body>
+        </header>
 
+        <main class="workspace">
+            <section class="panel editor-panel" aria-labelledby="editor-title">
+                <div class="panel-heading">
+                    <span class="eyebrow">01 / 输入</span>
+                    <h1 id="editor-title">写下逻辑表达式</h1>
+                    <p>用逆波兰写法描述逻辑关系，一键生成结构图。</p>
+                </div>
+                <div class="panel-content">
+                    <label class="field-label" for="ReversePol">逆波兰表达式</label>
+                    <textarea id="ReversePol" spellcheck="false" placeholder="例如：a b . fe >" aria-describedby="expression-help"></textarea>
+                    <p id="expression-help" class="field-hint">变量与运算符以空格分隔；支持常量 0 和 1。</p>
+                    <button id="generateButton" class="button button-primary full-width" type="button">
+                        <span aria-hidden="true">◇</span> 生成结构图
+                    </button>
+
+                    <div class="section-divider"></div>
+                    <div class="section-title">
+                        <h2>试试这些示例</h2>
+                        <span>点击填入</span>
+                    </div>
+                    <div class="example-list">
+                        <button class="example" type="button" data-expression="a b . fe >">
+                            <span>与 → 蕴含</span><code>a b . fe ></code>
+                        </button>
+                        <button class="example" type="button" data-expression="a b . fe ge > =">
+                            <span>组合等价</span><code>a b . fe ge > =</code>
+                        </button>
+                        <button class="example" type="button" data-expression="a b ,">
+                            <span>逻辑或</span><code>a b ,</code>
+                        </button>
+                    </div>
+
+                    <details class="disclosure">
+                        <summary>运算符速查 <span aria-hidden="true">⌄</span></summary>
+                        <div class="operator-grid">
+                            <code>.</code><span>与</span><code>,</code><span>或</span>
+                            <code>&lt;</code><span>非</span><code>&gt;</code><span>蕴含</span>
+                            <code>=</code><span>等价 / 同或</span>
+                        </div>
+                    </details>
+
+                    <details class="disclosure advanced-panel" id="advancedPanel">
+                        <summary>高级：JSON 编辑 <span aria-hidden="true">⌄</span></summary>
+                        <div class="advanced-content">
+                            <p>直接编辑图形数据。无效内容不会覆盖当前画布。</p>
+                            <label class="field-label" for="myModel">图形 JSON</label>
+                            <textarea id="myModel" spellcheck="false" aria-label="图形 JSON">{"nodeArray":[],"linkArray":[]}</textarea>
+                            <div class="advanced-actions">
+                                <button id="loadButton" class="button button-secondary" type="button">从 JSON 绘图</button>
+                                <button id="syncButton" class="button button-quiet" type="button">图转 JSON</button>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </section>
+
+            <section class="panel canvas-panel" aria-labelledby="canvas-title">
+                <div class="canvas-toolbar">
+                    <div>
+                        <span class="eyebrow">02 / 可视化</span>
+                        <h2 id="canvas-title">结构画布</h2>
+                    </div>
+                    <div class="canvas-tools" aria-label="画布操作">
+                        <button id="zoomOutButton" class="icon-button" type="button" title="缩小" aria-label="缩小">−</button>
+                        <button id="zoomInButton" class="icon-button" type="button" title="放大" aria-label="放大">+</button>
+                        <button id="fitButton" class="button button-quiet" type="button">适应画布</button>
+                    </div>
+                </div>
+                <div class="main-container" aria-label="逻辑结构图画布">
+                    <div id="paper-container"><div id="paper"></div></div>
+                    <div class="canvas-empty" id="canvasEmpty">
+                        <div class="empty-glyph" aria-hidden="true">◇</div>
+                        <strong>从表达式开始</strong>
+                        <p>输入左侧的表达式，或载入已有 JSON。</p>
+                    </div>
+                    <div class="mini-map" aria-label="画布小地图">
+                        <div id="mini-paper"></div>
+                        <div id="mini-view"></div>
+                    </div>
+                </div>
+                <div class="canvas-footer">
+                    <span>拖动画布平移 · 滚轮缩放 · 点击节点查看详情</span>
+                    <span id="zoomLabel">100%</span>
+                </div>
+            </section>
+
+            <aside class="panel inspector-panel" aria-labelledby="inspector-title">
+                <div class="panel-heading">
+                    <span class="eyebrow">03 / 属性</span>
+                    <h2 id="inspector-title">节点信息</h2>
+                    <p>选择画布中的节点以查看和编辑。</p>
+                </div>
+                <div class="panel-content">
+                    <div id="inspectorEmpty" class="inspector-empty">
+                        <span aria-hidden="true">◎</span>
+                        <strong>尚未选择节点</strong>
+                        <p>点击图中的一个节点。</p>
+                    </div>
+                    <div id="inspectorForm" hidden>
+                        <div class="node-summary">
+                            <span id="nodeType" class="node-type"></span>
+                            <code id="nodeKey"></code>
+                        </div>
+                        <label class="field-label" for="ERName">节点名称</label>
+                        <input id="ERName" type="text" maxlength="100">
+                        <label class="field-label memo-label" for="ERMemo">备注</label>
+                        <textarea id="ERMemo" rows="6" placeholder="为这个节点添加说明"></textarea>
+                        <button id="ERSetName" class="button button-primary full-width" type="button">保存节点信息</button>
+                    </div>
+                </div>
+                <div class="inspector-tip">所有修改都会保留在导出的 JSON 中。</div>
+            </aside>
+        </main>
+
+        <footer class="statusbar">
+            <span class="status-dot" aria-hidden="true"></span>
+            <p id="status" role="status" aria-live="polite">就绪。输入表达式并生成结构图。</p>
+            <span class="status-caption">本地运行 · 无需登录</span>
+        </footer>
+    </div>
+    <script src="ViewGen.js"></script>
+</body>
 </html>

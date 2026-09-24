@@ -1,978 +1,490 @@
-var app = app || {};
-
-var origin = {
-    nodeArray: [],
-    linkArray: []
-};
-
-var chosedElement = {
-    Nodes: new Set([]),
-    Links: new Set([]),
-    Routing: new Set([])
-}
-
-var graph = new joint.dia.Graph;
+/* LogicSim workbench. Source diagrams keep the original nodeArray/linkArray format. */
+var app = {};
+var origin = { nodeArray: [], linkArray: [] };
+var graph = new joint.dia.Graph();
+var mainContainer = document.querySelector(".main-container");
+var paperContainer = document.getElementById("paper-container");
+var miniMap = document.querySelector(".mini-map");
+var miniView = document.getElementById("mini-view");
+var statusBar = document.querySelector(".statusbar");
+var statusText = document.getElementById("status");
+var selectedId = null;
+var zoom = 1;
+var baseWidth = 800;
+var baseHeight = 600;
+var graphBounds = { x: 0, y: 0, width: 800, height: 600 };
+var miniTransform = { scale: 1, x: 0, y: 0 };
+var miniWidth = 190;
+var miniHeight = 124;
 
 var paper = new joint.dia.Paper({
-    el: document.getElementById('paper'),
+    el: document.getElementById("paper"),
     model: graph,
-    width: 800,
-    height: 600,
+    width: baseWidth,
+    height: baseHeight,
     gridSize: 10,
-    drawGrid: true,
-    background: {
-        color: 'rgba(150, 250, 200, 0.3)'
-    }
-
+    drawGrid: false,
+    background: { color: "transparent" }
 });
-
-var startPoint = { x: 0, y: 0 };
-var newScale = 1;
-var originSize = { height: 0, width: 0, tx: 0, ty: 0 };
-var mainContainer = $(".main-container");
-var paperContainer = $("#paper-container");
-var paperContent = $("#paper");
-
-var VarPad = 50;
-
-var miniScale = 0.1;
-var miniMap = $(".mini-map");
-var miniPaper = $("#mini-paper");
-var miniPaperJ = new joint.dia.Paper({
-    el: document.getElementById('mini-paper'),
+var miniPaper = new joint.dia.Paper({
+    el: document.getElementById("mini-paper"),
     model: graph,
-    width: 800 * miniScale,
-    height: 600 * miniScale,
-    background: {
-        color: 'rgba(150, 250, 200, 0.3)'
-    }
-
+    width: miniWidth,
+    height: miniHeight,
+    interactive: false,
+    background: { color: "transparent" }
 });
-var miniView = $("#mini-view");
-var appResize = $("#app-resize");
 
+function setStatus(message, isError) {
+    statusText.textContent = message;
+    statusBar.classList.toggle("is-error", Boolean(isError));
+}
 
-miniView.css({
-    border: "2px solid #31d0c6",
-    position: "absolute",
-    backgroundColor: "rgba(250, 200, 200, 0.2)",
-    cursor: "move"
-});
-var centerPivot = {
-    left: (mainContainer.width() / 2 - paperContainer.position.left) * miniScale,
-    top: (mainContainer.height() / 2 - paperContainer.position.top) * miniScale
-};
-var miniResize = $("#mini-resize");
-var rightContainer = $(".right-container");
-
-function setContainerAndMini() {
-    var newWidth = paper.options.width + 200;
-    var newHeight = paper.options.height + 100;
-    var newTop = 0;
-    var newLeft = 0;
-    if (newWidth > (2 * newHeight)) {
-        newHeight = newWidth / 2;
-        newLeft = (newWidth - paper.options.width) / 2;
-        newTop = (newHeight - paper.options.height) / 2;
-    } else {
-        newWidth = 2 * newHeight;
-        newLeft = (newWidth - paper.options.width) / 2;
-        newTop = (newHeight - paper.options.height) / 2;
+function nodePorts(type) {
+    var input = function (id) {
+        return { group: "in", id: id, attrs: { portLabel: { text: id } } };
     };
-    paperContent.css({
-        left: newLeft,
-        top: newTop
-    });
-
-    miniScale = 300 / newWidth;
-    paperContainer.css({ height: newHeight, width: newWidth });
-
-    miniPaperJ.setDimensions(miniScale * paper.options.width, miniScale * paper.options.height);
-    miniPaperJ.scaleContentToFit({ padding: VarPad * miniScale })
-
-
-    miniPaper.css("left", miniScale * newLeft);
-    miniPaper.css("top", miniScale * newTop);
-    miniView.css({
-        height: miniScale * mainContainer.height(), width: miniScale * mainContainer.width(),
-        left: -1 * miniScale * paperContainer.position().left,
-        top: -1 * miniScale * paperContainer.position().top
-    });
-}
-
-
-miniMap.on(
-    {
-        "mousedown": function (evt) {
-            evt.preventDefault();
-            evt.stopPropagation();
-            miniView.css({
-                left: Math.round(evt.pageX - (miniView.width() / 2)),
-                top: Math.round(evt.pageY - (miniView.height() / 2)),
-            });
-            paperContainer.css({
-                left: -1 * Math.round(miniView.position().left / miniScale),
-                top: -1 * Math.round(miniView.position().top / miniScale)
-            });
-            $("body").on("mousemove", function (evt) {
-                miniView.css({
-                    left: Math.round(evt.pageX - (miniView.width() / 2)),
-                    top: Math.round(evt.pageY - (miniView.height() / 2)),
-                });
-                paperContainer.css({
-                    left: -1 * Math.round(miniView.position().left / miniScale),
-                    top: -1 * Math.round(miniView.position().top / miniScale)
-                });
-
-            });
-            $("body").on("mouseup", function (evt) {
-                $(this).off("mousemove mouseup");
-            })
-        }
-    }
-);
-miniView.on(
-    {
-        "mousedown": function (evt) {
-            evt.preventDefault();
-            evt.stopPropagation();
-            var tempX = evt.pageX;
-            var tempY = evt.pageY;
-            var tempLT = miniView.position();
-            $("body").on("mousemove", function (evt) {
-                miniView.css({
-                    left: evt.pageX - tempX + tempLT.left,
-                    top: evt.pageY - tempY + tempLT.top,
-                });
-                paperContainer.css({
-                    left: -1 * Math.round(miniView.position().left / miniScale),
-                    top: -1 * Math.round(miniView.position().top / miniScale)
-                });
-
-            });
-            $("body").on("mouseup", function (evt) {
-                $(this).off("mousemove mouseup");
-            })
-        }
-    }
-);
-var contentSize = paper.getContentBBox();
-var ERKeyNow = undefined;
-const ERMask = joint.highlighters.mask;
-const ERMaskRect = joint.dia.HighlighterView.extend({
-
-    tagName: 'rect',
-
-    attributes: {
-        'stroke': 'red',
-        'fill': '#fff000',
-        'fill-opacity': 0.5,
-        'pointer-events': 'none'
-    },
-
-    options: {
-        padding: 5
-    },
-
-    // Method called to highlight a CellView
-    highlight(_cellView, _node) {
-        const { padding } = this.options;
-        const bbox = _cellView.model.getBBox();
-        // Highlighter is always rendered relatively to the CellView origin
-        bbox.x = bbox.y = 0;
-        // Increase the size of the highlighter
-        bbox.inflate(padding);
-        this.vel.attr(bbox.toJSON());
-    },
-
-    // Method called to unhighlight a CellView
-    unhighlight(_cellView, _node) {
-        // Cleaning required when the highlighter adds
-        // attributes/nodes to the CellView or Paper.
-        // This highlighter only renders a rectangle.
-    }
-
-});
-
-const ERHighlightLink = function (id) {
-    ERMask.add(paper.findViewByModel(id), 'body', 'highlight-red', {
-        deep: true,
-        attrs: {
-            'stroke': '#FF4365',
-            'stroke-width': 2
-        }
-    });
-    ERMaskRect.add(graph.getCell(id).findView(miniPaperJ), 'root', 'highlight-mini', {
-        layer: 'front' // "layer" is an option inherited from the base class
-    });
-    graph.getLinks().filter(function (cell) { return cell.attributes.source.id == id || cell.attributes.target.id == id }).forEach(function (cell) {
-        chosedElement.Links.add(cell.id);
-        ERMask.add(cell.findView(paper), 'line', 'highlight-yellow', {
-            padding: 1,
-            deep: true,
-            attrs: {
-                'stroke': '#fff000',
-                'stroke-width': 2
-            }
-        });
-    });
-};
-const ERUnhighlight = function (id) {
-    if (undefined != graph.getCell(id)) {
-        joint.dia.HighlighterView.remove(graph.getCell(id).findView(paper));
-        joint.dia.HighlighterView.remove(graph.getCell(id).findView(miniPaperJ));
-    }
-};
-
-paper.on({
-    'cell:pointerup': function (cellView) {
-        var contentSize2 = paper.getContentBBox();
-        var changex = Math.abs(contentSize2.width - contentSize.width);
-        var changey = Math.abs(contentSize2.height - contentSize.height);
-
-        if (changex > 20 * newScale || changey > 20 * newScale) {
-            VarPad = 50 * newScale;
-            paper.fitToContent({
-                padding: VarPad,
-                allowNewOrigin: "any"
-            });
-            setContainerAndMini();
-            contentSize = contentSize2;
-        }
-        else {
-
-        }
-
-    },
-    'blank:pointerdown': function (evt) {
-        startPoint.x = evt.clientX;
-        startPoint.y = evt.clientY;
-        var nowOffSet = paperContainer.position();
-        $("body").on("mousemove", function (evt) {
-            var changes = {
-                x: evt.clientX - startPoint.x,
-                y: evt.clientY - startPoint.y
-            };
-            var newtop = nowOffSet.top + changes.y;
-            var newleft = nowOffSet.left + changes.x;
-
-            paperContainer.css({
-                top: newtop,
-                left: newleft
-            });
-
-            miniView.css({
-                height: miniScale * mainContainer.height(), width: miniScale * mainContainer.width(),
-                left: -1 * miniScale * paperContainer.position().left,
-                top: -1 * miniScale * paperContainer.position().top
-            });
-
-        });
-        $("body").on("mouseup", function (evt) {
-            $(this).off("mousemove mouseup");
-        });
-
-
-    },
-    'blank:pointerdblclick': function (evt) {
-        /*highlight off */
-
-        chosedElement.Nodes.forEach(ERUnhighlight);
-
-        chosedElement.Links.forEach(ERUnhighlight);
-        chosedElement.Routing.forEach(ERUnhighlight);
-        chosedElement.Nodes.clear();
-
-        chosedElement.Links.clear();
-        chosedElement.Routing.clear();
-        /* graph.getCells().forEach(function (cell) {
-            joint.dia.HighlighterView.remove(cell.findView(paper));
-        }) */
-    },
-    'element:mouseenter': function (elementView) {
-        var model = elementView.model;
-        var bbox = model.getBBox();
-        var ellipseRadius = (1 - Math.cos(g.toRad(45)));
-        var offset = model.attr(['pointers', 'pointerShape']) === 'ellipse'
-            ? { x: -ellipseRadius * bbox.width / 2, y: ellipseRadius * bbox.height / 2 }
-            : { x: -3, y: 3 };
-
-        elementView.addTools(new joint.dia.ToolsView({
-            tools: [
-                new joint.elementTools.Remove({
-                    useModelGeometry: true,
-                    y: '0%',
-                    x: '100%',
-                    offset: offset
-                }),
-                new joint.elementTools.Boundary({
-                    focusOpacity: 0.5,
-                    padding: 10,
-                    useModelGeometry: true
-                })
-            ]
-        }));
-    },
-    'link:mouseenter': function (linkView) {
-        linkView.addTools(new joint.dia.ToolsView({
-            tools: [
-                new joint.linkTools.Remove({
-                    useModelGeometry: true,
-                    y: '0%',
-                    x: '100%',
-                    offset: 1.0
-                }),
-                new joint.linkTools.Boundary({
-                    focusOpacity: 0.5,
-                    padding: 3,
-                    useModelGeometry: true
-                })
-            ]
-        }));
-    },
-    'element:pointerclick': function (elementView) {
-        ERKeyNow = elementView.model.id;
-        chosedElement.Nodes.add(ERKeyNow);
-        ERHighlightLink(ERKeyNow);
-
-        var ERName = document.getElementById("ERName");
-        ERName.value = JSON.stringify(elementView.model.attr().label.text.split("\n"));
-        //ERName.style = "width:" + ERName.value.length * 0.5 + "em";
-
-        var ERMemo = document.getElementById("ERMemo");
-        ERMemo.value = elementView.model.attr().name.text;
-
-    },
-    'cell:mouseleave': function (cellView) {
-        cellView.removeTools();
-    },
-    'blank:contextmenu': function (evt, x, y) {
-        alert("position:" + "\n left:" + x + "\n top:" + y);
-    }/* ,
-    'cell:mouseover': function (cellView, evt) {
-        var pos = paper.clientToLocalPoint(evt.clientX, evt.clientY);
-        document.getElementById("pointx").textContent = pos.x;
-        document.getElementById("pointy").textContent = pos.y;
-    },
-    'blank:mouseover': function (evt) {
-        var pos = paper.clientToLocalPoint(evt.clientX, evt.clientY);
-        document.getElementById("pointx").textContent = pos.x;
-        document.getElementById("pointy").textContent = pos.y;
-    } */
-});
-function viewScale(rate) {
-    originSize = {
-        width: paper.options.width,
-        height: paper.options.height,
-        tx: paper.translate().tx,
-        ty: paper.translate().ty
+    var output = function (id) {
+        return { group: "out", id: id, attrs: { portLabel: { text: id } } };
     };
-    var centerX = mainContainer.width() / 2;
-    var centerY = mainContainer.height() / 2;
-    centerPivot = {
-        left: (centerX - paperContainer.position().left) * miniScale,
-        top: (centerY - paperContainer.position().top) * miniScale
-    }
-
-    newScale = newScale * rate;
-    if (newScale > 0.1 && newScale < 10) {
-        //paper.scale(newScale, newScale, p.x, p.y);
-        originSize = {
-            width: rate * originSize.width,
-            height: rate * originSize.height,
-            tx: rate * originSize.tx,
-            ty: rate * originSize.ty
-        };
-        VarPad = 50 * newScale;
-        paper.setDimensions(originSize.width, originSize.height);
-        paper.scaleContentToFit({ padding: VarPad });
-        //paper.translate(originSize.tx, originSize.ty);
-
-        setContainerAndMini();
-        paperContainer.css({
-            left: centerX - (centerPivot.left / miniScale),
-            top: centerY - (centerPivot.top / miniScale)
-        });
-        miniView.css({
-            left: -1 * miniScale * paperContainer.position().left,
-            top: -1 * miniScale * paperContainer.position().top
-        });
-    }
-    else {
-        newScale = newScale / rate;
-    }
-}
-//paper.$el
-mainContainer.on('mousewheel DOMMouseScroll', function (e) {
-    //function onMouseWheel(e){
-    e.preventDefault();
-    // e = e.originalEvent;
-    // e.stopPropagation();
-    var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail))) / 10;
-    var rate = (newScale + delta) / newScale;
-    var p = paper.clientToLocalPoint({ x: e.clientX, y: e.clientY });
-    viewScale(rate);
-    //console.log(' delta' + delta + ' ' + 'offsetX' + p.x + 'offsety' + p.y + 'newScale' + newScale)
-});
-
-miniResize.on(
-    {
-        "mousedown": function (evt) {
-            evt.preventDefault();
-            evt.stopPropagation();
-            centerPivot = {
-                left: miniView.width() / 2 + miniView.position().left,
-                top: miniView.height() / 2 + miniView.position().top
-            };
-            $("body").on("mousemove", function (evt) {
-                var rate = miniView.width() / (2 * (evt.pageX - centerPivot.left));
-                if ((10 / rate) > newScale) {
-                    viewScale(rate);
-                } else {
-                    rate = 10 / newScale;
-                    viewScale(rate);
-                }
-            });
-            $("body").on("mouseup", function (evt) {
-                $(this).off("mousemove mouseup");
-            })
-        }
-    }
-);
-
-appResize.on({
-    "mousedown": function (evt) {
-        evt.preventDefault();
-        evt.stopPropagation();
-        var tempX = evt.pageX;
-        var tempRight1 = parseInt(appResize.css("right").split("px")[0]);
-        $("body").on("mousemove", function (evt) {
-            var xDelta = Math.round(tempX - evt.pageX) + tempRight1;
-            appResize.css({
-                right: xDelta
-            });
-            rightContainer.css({
-                width: xDelta
-            });
-            mainContainer.css({
-                right: xDelta + 6
-            })
-
-        });
-        $("body").on("mouseup", function (evt) {
-            $(this).off("mousemove mouseup");
-        })
-    }
-})
-
-app.ResizeBlock = function () {
-    if (rightContainer.width() < 280) {
-        appResize.css({
-            right: 300
-        });
-        rightContainer.css({
-            width: 300
-        });
-        mainContainer.css({
-            right: 306
-        });
-        appResize.children().css({ "background-image": "url(assets/box-arrow-in-right.svg)" });
-    } else {
-        appResize.css({
-            right: 0
-        });
-        rightContainer.css({
-            width: 0
-        });
-        mainContainer.css({
-            right: 6
-        });
-        appResize.children().css({ "background-image": "url(assets/box-arrow-in-left.svg)" });
-    }
+    if (type === "Export") return [input("OUT")];
+    if (type === "SEL") return [
+        input("SI"), input("0"), input("1"),
+        output("SO"), output("N"), output("P")
+    ];
+    return [output("OUT")];
 }
 
-$("body").on('keydown', function (e) {
-    // e.preventDefault();
-    // e = e.originalEvent;
-    // e.stopPropagation();
-    if (e.altKey) {
-        var delta = 0.2;
-        if (38 == e.which) {
-            var rate = (newScale + delta) / newScale;
-            viewScale(rate);
-        } else if (40 == e.which) {
-            var rate = (newScale - delta) / newScale;
-            viewScale(rate);
-        } else if (219 == e.which || 221 == e.which) {
-            app.ResizeBlock();
-        }
-    }
-    //console.log(' delta' + delta + ' ' + 'offsetX' + p.x + 'offsety' + p.y + 'newScale' + newScale)
-});
-
-
-const status = document.getElementById('status');
-
-app.makeNode = function (theKey, theLabel, theName, theColor, theImgPath, thePorts) {
-    var portColor = "#61549c";
-    var theWidth = 100;
-    var theHeight = 100;
+function makeNode(node) {
+    var colors = {
+        "0": "#f1a05b",
+        "1": "#34b9a8",
+        Import: "#5f8fe5",
+        Export: "#a67be3",
+        SEL: "#d98094"
+    };
+    var images = {
+        "0": "assets/zero.svg",
+        "1": "assets/one.svg",
+        Import: "assets/input.svg",
+        Export: "assets/output.svg",
+        SEL: "assets/SEL.svg"
+    };
+    var width = 108;
+    var height = 104;
     return new joint.shapes.standard.Rectangle({
-        id: theKey,
-        size: { width: theWidth, height: theHeight },
+        id: String(node.key),
+        nodeType: node.type,
+        memo: node.memo || "",
+        size: { width: width, height: height },
         attrs: {
             label: {
-                text: theLabel,
-                fontSize: 12,
-                fontFamily: 'monospace',
-                fill: 'white',
-                fontWeight: 'bold'
+                text: node.type,
+                fontSize: 11,
+                fontFamily: "Arial, sans-serif",
+                fill: "#fff",
+                fontWeight: "bold"
             },
             body: {
-                fill: theColor,
+                fill: colors[node.type],
                 width: "100%",
                 height: "100%",
-                rx: 5,
-                ry: 5,
-                stroke: 'none'
+                rx: 10,
+                ry: 10,
+                stroke: "none"
             },
             image: {
-                "xlink:href": theImgPath,
-                width: 50,
-                height: 50, x: theWidth / 2 - 25, y: theHeight / 2 - 25
+                "xlink:href": images[node.type],
+                width: 48,
+                height: 48,
+                x: 30,
+                y: 22
             },
             name: {
-                text: theName,
-                fontSize: 12,
-                fontFamily: 'monospace',
-                fill: 'white',
-                fontWeight: 'bold'
+                text: node.name || "",
+                fontSize: 11,
+                fontFamily: "Arial, sans-serif",
+                fill: "#fff",
+                fontWeight: "bold"
             }
         },
         markup: [
-
-            {
-                tagName: 'rect',
-                selector: 'body',
-            },
-            {
-                tagName: 'text',
-                selector: 'label',
-                attributes: {
-                    y: -2 * theHeight / 5
-                }
-            },
-            {
-                tagName: "image",
-                selector: "image"
-            },
-            {
-                tagName: 'text',
-                selector: 'name',
-                attributes: {
-                    transform: "matrix(1,0,0,1," + theWidth / 2 + "," + 8 * theHeight / 10 + ")",
-                    "text-anchor": "middle",
-
-                }
-            }],
+            { tagName: "rect", selector: "body" },
+            { tagName: "text", selector: "label", attributes: { x: 54, y: 12, "text-anchor": "middle" } },
+            { tagName: "image", selector: "image" },
+            { tagName: "text", selector: "name", attributes: { x: 54, y: 92, "text-anchor": "middle" } }
+        ],
         ports: {
             groups: {
                 in: {
                     attrs: {
-                        portBody: { magnet: true, fill: portColor, stokeWidth: 0 },
-                        portLabel: { fill: portColor, fontSize: 11, fontWeight: "Normal" }
+                        portBody: { magnet: true, fill: "#24456b", stroke: "#fff", strokeWidth: 1 },
+                        portLabel: { fill: "#425b7b", fontSize: 11, fontWeight: "bold" }
                     },
-                    markup: [{
-                        tagName: "rect",
-                        selector: "portBody",
-                        attributes: {
-                            height: 10,
-                            width: 10,
-                            x: -5,
-                            y: -5
-                        }
-                    },
-                    {
-                        tagName: "text",
-                        selector: "portLabel",
-                        attributes: {
-                            x: 6,
-                            y: 3
-                        }
-                    }],
+                    markup: [
+                        { tagName: "circle", selector: "portBody", attributes: { r: 5 } },
+                        { tagName: "text", selector: "portLabel", attributes: { x: 9, y: 4 } }
+                    ],
                     position: { name: "left" }
                 },
                 out: {
                     attrs: {
-                        portBody: { magnet: true, fill: portColor, stokeWidth: 0 },
-                        portLabel: { fill: portColor, fontSize: 11, fontWeight: "Normal" }
+                        portBody: { magnet: true, fill: "#24456b", stroke: "#fff", strokeWidth: 1 },
+                        portLabel: { fill: "#425b7b", fontSize: 11, fontWeight: "bold" }
                     },
-                    markup: [{
-                        tagName: "rect",
-                        selector: "portBody",
-                        attributes: {
-                            height: 10,
-                            width: 10,
-                            x: -5,
-                            y: -5
-                        }
-                    },
-                    {
-                        tagName: "text",
-                        selector: "portLabel",
-                        attributes: {
-                            x: -6,
-                            y: 3,
-                            "text-anchor": "end"
-                        }
-                    }],
+                    markup: [
+                        { tagName: "circle", selector: "portBody", attributes: { r: 5 } },
+                        { tagName: "text", selector: "portLabel", attributes: { x: -9, y: 4, "text-anchor": "end" } }
+                    ],
                     position: { name: "right" }
                 }
             },
-            items: thePorts
+            items: nodePorts(node.type)
         }
     });
-};
-app.nodeCreate = function (theNode) {
-    var result = {};
-    if ("0" == theNode.type) {
-        result = app.makeNode(
-            theNode.key,
-            theNode.type,
-            theNode.name,
-            "#FE854F",
-            "assets/zero.svg",
-            [{ group: "out", id: "OUT", attrs: { portLabel: { text: "OUT" } } },]
-        )
-    }
-    else if ("1" == theNode.type) {
-        result = app.makeNode(
-            theNode.key,
-            theNode.type,
-            theNode.name,
-            "#31D0C6",
-            "assets/one.svg",
-            [{ group: "out", id: "OUT", attrs: { portLabel: { text: "OUT" } } },]
-        )
-    }
-    else if ("Import" == theNode.type) {
-        result = app.makeNode(
-            theNode.key,
-            theNode.type,
-            theNode.name,
-            "#ff0000",
-            "assets/input.svg",
-            [{ group: "out", id: "OUT", attrs: { portLabel: { text: "OUT" } } },]
-        )
-    }
-    else if ("Export" == theNode.type) {
-        result = app.makeNode(
-            theNode.key,
-            theNode.type,
-            theNode.name,
-            "#ff00ff",
-            "assets/output.svg",
-            [{ group: "in", id: "OUT", attrs: { portLabel: { text: "OUT" } } },]
-        )
-    }
-    else if ("SEL" == theNode.type) {
-        result = app.makeNode(
-            theNode.key,
-            theNode.type,
-            "",
-            "#ffcccc",
-            "assets/SEL.svg",
-            [{
-                group: "in", id: "SI",
-                attrs: { portLabel: { text: "SI" } }
-            },
-            {
-                group: "in", id: "0", attrs: { portLabel: { text: "0" } }
-            },
-            {
-                group: "in", id: "1", attrs: { portLabel: { text: "1" } }
-            },
-            { group: "out", id: "SO", attrs: { portLabel: { text: "SO" } } },
-            { group: "out", id: "N", attrs: { portLabel: { text: "N" } } },
-            { group: "out", id: "P", attrs: { portLabel: { text: "P" } } }]
+}
 
-        );
-    };
-    return result;
-};
-app.linkCreate = function (theNode) {
-    return new joint.shapes.standard.Link(
-        {
-            source: { id: theNode.from, magnet: "portBody", port: theNode.frompid },
-            target: { id: theNode.to, magnet: "portBody", port: theNode.topid },
-            smooth: true,
-            connector: { name: "jumpover", args: { size: 5 } },
-            router: {
-                name: 'metro',
-                args: {
-                    step: 10,
-                    startDirections: ["right"],
-                    endDirections: ["left"]
-                }
+function makeLink(link) {
+    return new joint.shapes.standard.Link({
+        source: { id: String(link.from), port: link.frompid },
+        target: { id: String(link.to), port: link.topid },
+        attrs: {
+            line: {
+                stroke: "#7b94bb",
+                strokeWidth: 2,
+                targetMarker: { type: "path", d: "M 10 -5 0 0 10 5 z", fill: "#7b94bb" }
             }
-        })
-};
-app.ELCreate = function (GraphDesc) {
-    var result = [];
-    for (oneNode of GraphDesc.nodeArray) {
-        result.push(app.nodeCreate(oneNode));
+        },
+        connector: { name: "jumpover", args: { size: 5 } },
+        router: {
+            name: "metro",
+            args: { step: 10, startDirections: ["right"], endDirections: ["left"] }
+        }
+    });
+}
+
+function validateModel(model) {
+    if (!model || typeof model !== "object" || Array.isArray(model) ||
+        !Array.isArray(model.nodeArray) || !Array.isArray(model.linkArray)) {
+        return "JSON 必须包含 nodeArray 和 linkArray 两个数组。";
     }
-    for (oneLink of GraphDesc.linkArray) {
-        result.push(app.linkCreate(oneLink));
-    }
-    return result;
-};
-app.ELDump = function (JsonCells) {
-    var result = {
-        nodeArray: [],
-        linkArray: []
+    var allowed = { "0": true, "1": true, Import: true, Export: true, SEL: true };
+    var ports = {
+        "0": ["OUT"], "1": ["OUT"], Import: ["OUT"],
+        Export: ["OUT"], SEL: ["SI", "0", "1", "SO", "N", "P"]
     };
-    for (oneElem of JsonCells) {
-        if ("standard.Link" == oneElem.type) {
-            result.linkArray.push({
-                "from": oneElem.source.id,
-                "frompid": oneElem.source.port,
-                "to":oneElem.target.id,
-                "topid":oneElem.target.port
+    var nodes = {};
+    for (var i = 0; i < model.nodeArray.length; i++) {
+        var node = model.nodeArray[i];
+        if (!node || typeof node !== "object" ||
+            (typeof node.key !== "string" && typeof node.key !== "number") ||
+            String(node.key) === "" || !allowed[node.type]) {
+            return "第 " + (i + 1) + " 个节点的 key 或 type 无效。";
+        }
+        if ((node.name !== undefined && typeof node.name !== "string") ||
+            (node.memo !== undefined && typeof node.memo !== "string")) {
+            return "第 " + (i + 1) + " 个节点的 name 或 memo 必须是文本。";
+        }
+        if (nodes[String(node.key)]) return "节点 key 重复：" + node.key + "。";
+        nodes[String(node.key)] = node.type;
+    }
+    for (var j = 0; j < model.linkArray.length; j++) {
+        var link = model.linkArray[j];
+        if (!link || typeof link !== "object" ||
+            !nodes[String(link.from)] || !nodes[String(link.to)] ||
+            !ports[nodes[String(link.from)]].includes(String(link.frompid)) ||
+            !ports[nodes[String(link.to)]].includes(String(link.topid))) {
+            return "第 " + (j + 1) + " 条连线的节点或端口无效。";
+        }
+    }
+    return "";
+}
+
+function dumpModel() {
+    return {
+        nodeArray: graph.getElements().map(function (cell) {
+            var item = {
+                key: cell.id,
+                type: cell.get("nodeType"),
+                name: cell.attr("name/text") || ""
+            };
+            if (cell.get("memo")) item.memo = cell.get("memo");
+            return item;
+        }),
+        linkArray: graph.getLinks().map(function (cell) {
+            return {
+                from: cell.get("source").id,
+                frompid: cell.get("source").port,
+                to: cell.get("target").id,
+                topid: cell.get("target").port
+            };
+        })
+    };
+}
+
+function updateEmptyState() {
+    var empty = graph.getElements().length === 0;
+    document.getElementById("canvasEmpty").hidden = !empty;
+    miniMap.hidden = empty;
+}
+
+function updateMiniMap() {
+    if (!graph.getElements().length) return;
+    miniWidth = miniMap.clientWidth;
+    miniHeight = miniMap.clientHeight;
+    miniPaper.setDimensions(miniWidth, miniHeight);
+    var width = Math.max(graphBounds.width, 1);
+    var height = Math.max(graphBounds.height, 1);
+    var scale = Math.min((miniWidth - 20) / width, (miniHeight - 20) / height);
+    miniTransform.scale = scale;
+    miniTransform.x = (miniWidth - width * scale) / 2 - graphBounds.x * scale;
+    miniTransform.y = (miniHeight - height * scale) / 2 - graphBounds.y * scale;
+    miniPaper.scale(scale, scale);
+    miniPaper.translate(miniTransform.x, miniTransform.y);
+    updateMiniView();
+}
+
+function updateMiniView() {
+    if (!graph.getElements().length) return;
+    var left = parseFloat(paperContainer.style.left) || 0;
+    var top = parseFloat(paperContainer.style.top) || 0;
+    var graphLeft = -left / zoom - (50 - graphBounds.x);
+    var graphTop = -top / zoom - (50 - graphBounds.y);
+    miniView.style.left = (graphLeft * miniTransform.scale + miniTransform.x) + "px";
+    miniView.style.top = (graphTop * miniTransform.scale + miniTransform.y) + "px";
+    miniView.style.width = (mainContainer.clientWidth / zoom * miniTransform.scale) + "px";
+    miniView.style.height = (mainContainer.clientHeight / zoom * miniTransform.scale) + "px";
+}
+
+function renderScale() {
+    var width = baseWidth * zoom;
+    var height = baseHeight * zoom;
+    paper.setDimensions(width, height);
+    paper.scale(zoom, zoom);
+    paper.translate((50 - graphBounds.x) * zoom, (50 - graphBounds.y) * zoom);
+    paperContainer.style.width = width + "px";
+    paperContainer.style.height = height + "px";
+    paperContainer.style.left = Math.round((mainContainer.clientWidth - width) / 2) + "px";
+    paperContainer.style.top = Math.round((mainContainer.clientHeight - height) / 2) + "px";
+    document.getElementById("zoomLabel").textContent = Math.round(zoom * 100) + "%";
+    updateMiniMap();
+}
+
+function fitGraph() {
+    graphBounds = graph.getElements().length
+        ? graph.getBBox()
+        : { x: 0, y: 0, width: 700, height: 500 };
+    baseWidth = Math.max(700, graphBounds.width + 100);
+    baseHeight = Math.max(500, graphBounds.height + 100);
+    zoom = Math.min(
+        1,
+        Math.max(.2, (mainContainer.clientWidth - 28) / baseWidth),
+        Math.max(.2, (mainContainer.clientHeight - 28) / baseHeight)
+    );
+    renderScale();
+}
+
+function changeZoom(factor) {
+    zoom = Math.max(.2, Math.min(3, zoom * factor));
+    renderScale();
+}
+
+function clearSelection() {
+    selectedId = null;
+    document.getElementById("inspectorEmpty").hidden = false;
+    document.getElementById("inspectorForm").hidden = true;
+}
+
+function drawModel(model) {
+    var previous = graph.toJSON();
+    try {
+        var cells = model.nodeArray.map(makeNode).concat(model.linkArray.map(makeLink));
+        graph.resetCells(cells);
+        if (cells.length) {
+            joint.layout.DirectedGraph.layout(graph, {
+                setLinkVertices: false,
+                nodeSep: 80,
+                edgeSep: 45,
+                rankSep: 95,
+                rankDir: "LR"
             });
         }
-        else {
-            if("SEL" == oneElem.attrs.label.text){
-                result.nodeArray.push({
-                    "key":oneElem.id,
-                    "type":"SEL"
-                });
-            }else{
-                result.nodeArray.push({
-                    "key":oneElem.id,
-                    "type":oneElem.attrs.label.text,
-                    "name":oneElem.attrs.name.text
-                });
-            }
-        }
-    };
-    return result;
+        origin = model;
+        clearSelection();
+        updateEmptyState();
+        fitGraph();
+        return true;
+    } catch (error) {
+        graph.fromJSON(previous);
+        updateEmptyState();
+        fitGraph();
+        setStatus("绘图失败：" + error.message, true);
+        return false;
+    }
 }
-
 
 app.parseLogic = function () {
-    var exprText = document.getElementById("ReversePol").value;
-    var resultParsed = LogicParser(exprText);
-    if ("string" == typeof (resultParsed)) {
-        status.textContent = resultParsed;
-        status.style.color = "red";
-    } else {
-        var viewModel = ViewGen(ModelGen(resultParsed));
-        origin = viewModel;
-        document.getElementById("myModel").value = JSON.stringify(origin);
-        status.textContent = "Reverse Polish Expression has been parsed.";
-        status.style.color = "black";
-    }
-};
-
-app.updateGraph = function () {
-    graph.resetCells(app.ELCreate(origin));
-    joint.layout.DirectedGraph.layout(graph, {
-        setLinkVertices: false,
-        nodeSep: 100,
-        edgeSep: 50,
-        rankSep: 100,
-        rankDir: "LR"
-    });
-    newScale = 1;
-    paper.fitToContent({
-        padding: 50,
-        allowNewOrigin: "any"
-    });
-    setContainerAndMini();
-    paperContainer.css({
-        left: Math.round((mainContainer.width() - paperContainer.width()) / 2),
-        top: Math.round((mainContainer.height() - paperContainer.height()) / 2),
-        position: "absolute"
-    });
-    miniView.css({
-        height: miniScale * mainContainer.height(), width: miniScale * mainContainer.width(),
-        left: -1 * miniScale * paperContainer.position().left,
-        top: -1 * miniScale * paperContainer.position().top
-    });
-}
-
-/*从文本框区域内载入*/
-app.load=function() {
+    var parsed = ParseExpression(document.getElementById("ReversePol").value);
+    if (parsed.error) return setStatus(parsed.error, true);
     try {
-        origin = JSON.parse(document.getElementById("myModel").value);
-        status.textContent = "Diagram Model Loaded from JSON format.";
-    }
-    catch (error) {
-        origin = {
-            nodeArray: [],
-            linkArray: []
-        };
-        status.textContent = "JSON format Error, Use Empty Format.";
-        document.getElementById("myModel").value = JSON.stringify(origin);
-    }
-    //ERUpdateOption();
-    app.updateGraph();
-    app.UpdateOption();
-};
-
-app.save=function() {
-    origin = app.ELDump(graph.toJSON().cells);
-    document.getElementById("myModel").value = JSON.stringify(origin);
-    status.textContent = "Diagram Model Saved in JSON format.";
-
-};
-
-function updateGraph() {
-    graph.resetCells(ELCreate(origin));
-    chosedElement.Sheets.clear();
-    chosedElement.Fields.clear();
-    chosedElement.Links.clear();
-    joint.layout.DirectedGraph.layout(graph, {
-        setLinkVertices: false,
-        marginX: 5,
-        marginY: 5
-    });
-    newScale = 1;
-    paper.fitToContent({
-        padding: 50,
-        allowNewOrigin: "any"
-    });
-    setContainerAndMini();
-    paperContainer.css({
-        left: Math.round((mainContainer.width() - paperContainer.width()) / 2),
-        top: Math.round((mainContainer.height() - paperContainer.height()) / 2),
-        position: "absolute"
-    });
-    miniView.css({
-        height: miniScale * mainContainer.height(), width: miniScale * mainContainer.width(),
-        left: -1 * miniScale * paperContainer.position().left,
-        top: -1 * miniScale * paperContainer.position().top
-    });
-
-};
-
-
-
-/*从本地载入文件，保存文件到本地 */
-if (window.FileList && window.File && window.FileReader) {
-    document.getElementById("fileToLoad").addEventListener('change', event => {
-        status.textContent = '已载入';
-        const fileToLoad = event.target.files[0];
-        if (!fileToLoad.type) {
-            status.textContent = 'Error: The File.type property does not appear to be supported on this browser.';
-            return;
+        var model = ViewGen(ModelGen(parsed.value));
+        var error = validateModel(model);
+        if (error) return setStatus(error, true);
+        if (drawModel(model)) {
+            document.getElementById("myModel").value = JSON.stringify(dumpModel(), null, 2);
+            setStatus("已生成结构图：" + model.nodeArray.length + " 个节点，" +
+                model.linkArray.length + " 条连线。");
         }
-        /* if (!file.type.match('image.*')) {
-          status.textContent = 'Error: The selected file does not appear to be an image.'
-          return;
-        } */
-        const reader = new FileReader();
-        reader.addEventListener('load', function (evt) {
-            var textFromFileLoaded = evt.target.result;
-            document.getElementById("myModel").value = textFromFileLoaded;
-            app.load();
-        });
-        reader.readAsText(fileToLoad, "UTF-8");
-    })
+    } catch (error) {
+        setStatus("表达式无法转换为图：" + error.message, true);
+    }
+};
 
-}
+app.load = function (text) {
+    var source = text === undefined ? document.getElementById("myModel").value : text;
+    var model;
+    try {
+        model = JSON.parse(source);
+    } catch (error) {
+        var location = /position (\d+)/.exec(error.message);
+        setStatus("JSON 语法错误：请检查引号、逗号和括号" +
+            (location ? "（约第 " + (Number(location[1]) + 1) + " 个字符）" : "") + "。", true);
+        return false;
+    }
+    var error = validateModel(model);
+    if (error) {
+        setStatus(error, true);
+        return false;
+    }
+    if (!drawModel(model)) return false;
+    if (text !== undefined) document.getElementById("myModel").value = text;
+    setStatus("已从 JSON 绘图：" + model.nodeArray.length + " 个节点。");
+    return true;
+};
 
-function destroyClickedElement(event) {
-    document.body.removeChild(event.target);
+app.save = function () {
+    origin = dumpModel();
+    document.getElementById("myModel").value = JSON.stringify(origin, null, 2);
+    setStatus("已将当前图写入 JSON 编辑器。");
 };
 
 app.saveTextAsFile = function () {
-    var textToSave = document.getElementById("myModel").value;
-    var textToSaveAsBlob = new Blob([textToSave], { type: "application/json" });
-    var textToSaveAsURL = window.URL.createObjectURL(textToSaveAsBlob);
-    var fileNameToSaveAs = document.getElementById("inputFileNameToSaveAs").value;
-
-    var downloadLink = document.createElement("a");
-    downloadLink.download = fileNameToSaveAs;
-    downloadLink.innerHTML = "Download File";
-    downloadLink.href = textToSaveAsURL;
-    downloadLink.onclick = destroyClickedElement;
-    downloadLink.style.display = "none";
-    document.body.appendChild(downloadLink);
-
-    downloadLink.click();
+    var model = dumpModel();
+    var blob = new Blob([JSON.stringify(model, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = "logic-diagram.json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    setStatus("已下载 logic-diagram.json。");
 };
 
-
-
-/* if (0 == Object.keys(origin).length) {
-    origin = {
-        nodeArray: [],
-        linkArray: []
-    };
-} */
-
-sheet3Node = $("#sheet3");
-
-
-app.UpdateOption = function () {
-    var ImportNames = new Set([]);
-    origin.nodeArray.forEach(function (theNode) {
-        if (undefined != theNode.name && "" != theNode.name) {
-            ImportNames.add(theNode.name);
-        }
-    })
-    ImportNames = Array.from(ImportNames);
-    sheet3Node.select2({
-        placeholder: "输入要查找的元素名称:",
-        data: ["sheet2Name1", "sheet2Name2"].concat(ImportNames),
-        multiple: false,
-        width: "17em"
-    });
-
-}
-
 app.ChangeName = function () {
-    try {
-        var sheets = JSON.parse(document.getElementById("ERName").value);
-    } catch (e) {
-        alert("Format Error");
-        return false;
+    if (selectedId === null) return setStatus("请先选择一个节点。", true);
+    var cell = graph.getCell(selectedId);
+    if (!cell) return setStatus("所选节点已不存在，请重新选择。", true);
+    var name = document.getElementById("ERName").value.trim();
+    var memo = document.getElementById("ERMemo").value.trim();
+    cell.attr("name/text", name);
+    cell.set("memo", memo);
+    origin = dumpModel();
+    document.getElementById("myModel").value = JSON.stringify(origin, null, 2);
+    setStatus("节点信息已保存。");
+};
+
+paper.on("element:pointerclick", function (elementView) {
+    var cell = elementView.model;
+    selectedId = cell.id;
+    document.getElementById("inspectorEmpty").hidden = true;
+    document.getElementById("inspectorForm").hidden = false;
+    document.getElementById("nodeType").textContent = cell.get("nodeType");
+    document.getElementById("nodeKey").textContent = String(cell.id);
+    document.getElementById("ERName").value = cell.attr("name/text") || "";
+    document.getElementById("ERMemo").value = cell.get("memo") || "";
+});
+
+paper.on("blank:pointerclick", clearSelection);
+paper.on("blank:pointerdown", function (event) {
+    if (event.pointerType === "touch") return;
+    var startX = event.clientX;
+    var startY = event.clientY;
+    var initialLeft = parseFloat(paperContainer.style.left) || 0;
+    var initialTop = parseFloat(paperContainer.style.top) || 0;
+    function move(moveEvent) {
+        paperContainer.style.left = (initialLeft + moveEvent.clientX - startX) + "px";
+        paperContainer.style.top = (initialTop + moveEvent.clientY - startY) + "px";
+        updateMiniView();
     }
-    if (!(sheets instanceof Array)) {
-        alert("Format Error");
-        return false;
-    };
-    if (0 == sheets.length) {
-        alert("Format Error");
-        return false;
+    function stop() {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", stop);
     }
-    var getArray = origin.nodeArray.filter(function (x) {
-        if ("Sheet" == x.type) {
-            for (z of sheets) {
-                if (0 != x.name.filter(function (y) { return z == y }).length) {
-                    return true;
-                }
-            }
-        }
-        return false;
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+});
+
+mainContainer.addEventListener("wheel", function (event) {
+    event.preventDefault();
+    changeZoom(event.deltaY < 0 ? 1.12 : 1 / 1.12);
+}, { passive: false });
+
+miniMap.addEventListener("click", function (event) {
+    if (!graph.getElements().length) return;
+    var rect = miniMap.getBoundingClientRect();
+    var graphX = (event.clientX - rect.left - miniTransform.x) / miniTransform.scale;
+    var graphY = (event.clientY - rect.top - miniTransform.y) / miniTransform.scale;
+    paperContainer.style.left =
+        (mainContainer.clientWidth / 2 - (graphX + 50 - graphBounds.x) * zoom) + "px";
+    paperContainer.style.top =
+        (mainContainer.clientHeight / 2 - (graphY + 50 - graphBounds.y) * zoom) + "px";
+    updateMiniView();
+});
+
+document.getElementById("generateButton").addEventListener("click", app.parseLogic);
+document.getElementById("importButton").addEventListener("click", function () {
+    document.getElementById("fileToLoad").click();
+});
+document.getElementById("loadButton").addEventListener("click", function () { app.load(); });
+document.getElementById("syncButton").addEventListener("click", app.save);
+document.getElementById("downloadButton").addEventListener("click", app.saveTextAsFile);
+document.getElementById("ERSetName").addEventListener("click", app.ChangeName);
+document.getElementById("zoomInButton").addEventListener("click", function () { changeZoom(1.2); });
+document.getElementById("zoomOutButton").addEventListener("click", function () { changeZoom(1 / 1.2); });
+document.getElementById("fitButton").addEventListener("click", fitGraph);
+
+document.querySelectorAll(".example").forEach(function (button) {
+    button.addEventListener("click", function () {
+        document.getElementById("ReversePol").value = button.dataset.expression;
+        document.getElementById("ReversePol").focus();
     });
-    if (getArray.length > 1) {
-        alert("Name Repeated in other Sheets");
-        return false;
-    } else {
-        var memoText = document.getElementById("ERMemo").value;
-        ERUnhighlight(ERKeyNow);
-        paper.findViewByModel(ERKeyNow).model.attr({
-            label: { text: sheets.join("\n"), memo: memoText }
-        });
-        app.save();
-    }
+});
+document.getElementById("ReversePol").addEventListener("keydown", function (event) {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") app.parseLogic();
+});
+document.getElementById("fileToLoad").addEventListener("change", function (event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () { app.load(String(reader.result)); };
+    reader.onerror = function () { setStatus("文件读取失败，请重试。", true); };
+    reader.readAsText(file, "UTF-8");
+    event.target.value = "";
+});
+
+if (typeof ResizeObserver !== "undefined") {
+    var observedWidth = mainContainer.clientWidth;
+    var observedHeight = mainContainer.clientHeight;
+    new ResizeObserver(function () {
+        if (mainContainer.clientWidth !== observedWidth || mainContainer.clientHeight !== observedHeight) {
+            observedWidth = mainContainer.clientWidth;
+            observedHeight = mainContainer.clientHeight;
+            renderScale();
+        }
+    }).observe(mainContainer);
 }
-
-
-
-app.load();
-
-
+clearSelection();
+updateEmptyState();
+renderScale();

@@ -1,118 +1,35 @@
-# logicsim
+# LogicSim · 逻辑结构工作台
 
+在浏览器中把逆波兰逻辑表达式转换为选择器结构图。项目是纯静态网站，无需后端或构建步骤。它展示逻辑结构，当前不提供交互式电路仿真。
 
-## Getting started
+## 使用
 
-本程序可通过直接 git clone 项目后，点击本目录下的 index.html 打开，
+运行本地静态服务器：
 
-也可以直接访问本项目的 [gitlab pages](https://kuangdash.gitlab.io/logicsim)，
-
-之后在“解析文本”按钮上面的文本框内输入“逆波兰逻辑表达式”。
-
-“逆波兰逻辑表达式”支持五种逻辑操作符：
-{
-“.”：“a b .”代表“a”和“b”的逻辑与，
-“,”：“a b ,”代表“a”和“b”的逻辑或，
-“<”：“a <”代表“a”的逻辑非，
-“>”：“a b >”代表“a”和“b”的逻辑推出，
-
-“=”：“a b =”代表“a”和“b”的逻辑等价/同或
-}。
-
-逆波兰逻辑表达式组合的举例说明：
-{
-“a b . fe >”即代表逻辑表达“a 与 b   推出了   fe”，
-
-“a b . fe ge > =”即代表逻辑表达“a 与 b  等价于  fe 推出了 ge”
-}。
-
-之后点击“解析文本”按钮，将“逆波兰逻辑表达式”转换为适合图形表示的 JSON 格式，
-
-之后再点击“解析文本”按钮旁的“文本转图”，得到最终的正规图形表示。
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.com/kuangdash/logicsim.git
-git branch -M main
-git push -uf origin main
+```sh
+python -m http.server 8765 --directory public
 ```
 
-## Integrate with your tools
+然后打开 <http://localhost:8765/>。输入表达式，点击“生成结构图”；也可以按 Ctrl/⌘ + Enter。点击示例可快速填入表达式。
 
-* [Set up project integrations](https://gitlab.com/kuangdash/logicsim/-/settings/integrations)
+| 运算符 | 含义 | 示例 |
+| --- | --- | --- |
+| `.` | 与 | `a b .` |
+| `,` | 或 | `a b ,` |
+| `<` | 非 | `a <` |
+| `>` | 蕴含 | `a b >` |
+| `=` | 等价／同或 | `a b =` |
 
-## Collaborate with your team
+组合示例：`a b . fe >`、`a b . fe ge > =`。支持常量 `0` 和 `1`。
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+画布支持拖动平移、滚轮或工具栏缩放、小地图定位、点击节点编辑名称及备注。顶部按钮可导入和下载 JSON；“高级：JSON 编辑”支持直接修改图形数据，以及图与 JSON 的往返转换。
 
-## Test and Deploy
+JSON 顶层保留 `nodeArray`、`linkArray` 两个数组。节点沿用 `key`、`type`、`name`，并可使用可选的 `memo` 文本；旧文件无需迁移。仓库中的 `public/latch.json` 可用于导入示例。
 
-Use the built-in continuous integration in GitLab.
+## 部署
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+`.github/workflows/pages.yml` 在推送到 `main` 时将 `public/` 上传到 GitHub Pages。站点使用相对资源路径，可从仓库子路径访问。
 
-***
+## 来源
 
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+本项目基于 [kuangdash/logicsim](https://gitlab.com/kuangdash/logicsim) 的源码改造。本地基线为原仓库 `main` 分支提交 `4498910e8f8efff0d7dfd4840739298e2a29f06e`。原仓库未提供许可证文件；代码权利人已确认本次复制、修改和公开发布的权限。功能与改造分析见 [ANALYSIS_AND_REDESIGN.md](ANALYSIS_AND_REDESIGN.md)。

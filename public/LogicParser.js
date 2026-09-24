@@ -155,6 +155,43 @@ function LogicParser(npn) {
     return e.pop();
 };
 
+// The original LogicParser is retained for reference. The UI uses this
+// validated parser so constants and malformed expressions are unambiguous.
+function ParseExpression(input) {
+    var source = String(input || "").trim();
+    if (!source) return { error: "请输入逆波兰逻辑表达式。" };
+
+    var tokens = source.split(/(\.|,|<|>|=|\s+)/).filter(function (token) {
+        return token && !/^\s+$/.test(token);
+    });
+    var stack = [];
+    var operations = {
+        ".": function (a, b) { return { S: a, 0: "0", 1: { S: b, 0: "0", 1: "1" } }; },
+        ",": function (a, b) { return { S: a, 0: { S: b, 0: "0", 1: "1" }, 1: "1" }; },
+        "<": function (a) { return { S: a, 0: "1", 1: "0" }; },
+        ">": function (a, b) { return { S: a, 0: "1", 1: { S: b, 0: "0", 1: "1" } }; },
+        "=": function (a, b) {
+            return { S: a, 0: { S: b, 0: "1", 1: "0" }, 1: { S: b, 0: "0", 1: "1" } };
+        }
+    };
+
+    for (var index = 0; index < tokens.length; index++) {
+        var token = tokens[index];
+        if (!Object.prototype.hasOwnProperty.call(operations, token)) {
+            stack.push(token);
+            continue;
+        }
+        var needed = token === "<" ? 1 : 2;
+        if (stack.length < needed) {
+            return { error: "运算符「" + token + "」缺少操作数（第 " + (index + 1) + " 项）。" };
+        }
+        var right = stack.pop();
+        stack.push(needed === 1 ? operations[token](right) : operations[token](stack.pop(), right));
+    }
+    if (stack.length !== 1) return { error: "表达式不完整：请检查运算符与操作数的数量。" };
+    return { value: stack[0] };
+}
+
 function ModelGen(np) {
     /* 0:"<"
        1:">" */
