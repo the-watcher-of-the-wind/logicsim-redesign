@@ -32,4 +32,8 @@ JSON 顶层保留 `nodeArray`、`linkArray` 两个数组。节点沿用 `key`、
 
 ## 来源
 
-本项目基于 [kuangdash/logicsim](https://gitlab.com/kuangdash/logicsim) 的源码改造。本地基线为原仓库 `main` 分支提交 `4498910e8f8efff0d7dfd4840739298e2a29f06e`。原仓库未提供许可证文件；代码权利人已确认本次复制、修改和公开发布的权限。功能与改造分析见 [ANALYSIS_AND_REDESIGN.md](ANALYSIS_AND_REDESIGN.md)。
+本项目基于 [kuangdash/logicsim](https://gitlab.com/kuangdash/logicsim) 的源码改造。本地基线为原仓库 `main` 分支提交 `4498910e8f8efff0d7dfd4840739298e2a29f06e`。原仓库未提供许可证文件。功能与改造分析见 [ANALYSIS_AND_REDESIGN.md](ANALYSIS_AND_REDESIGN.md)。
+
+## 声明
+
+本仓库及项目托管网页仅作作业展示用途，全部文件预计将在2026年10月31日前删除。
