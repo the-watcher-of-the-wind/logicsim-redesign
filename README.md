@@ -1,6 +1,7 @@
 # LogicSim · 逻辑结构工作台
 
 在浏览器中把逆波兰逻辑表达式转换为选择器结构图。项目是纯静态网站，无需后端或构建步骤。它展示逻辑结构，当前不提供交互式电路仿真。
+Github Pages: https://the-watcher-of-the-wind.github.io/logicsim-redesign/
 
 ## 使用
 
